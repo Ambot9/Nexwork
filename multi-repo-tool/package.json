@@ -1,0 +1,48 @@
+{
+  "name": "@yourusername/multi-repo-orchestrator",
+  "version": "1.0.0",
+  "description": "Multi-repository orchestrator for managing features across microservices with git worktrees",
+  "main": "dist/index.js",
+  "bin": {
+    "multi-repo": "bin/multi-repo.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "prepublish": "npm run build",
+    "install-global": "npm install -g .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "git",
+    "worktree",
+    "microservices",
+    "multi-repo",
+    "orchestrator",
+    "monorepo"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^14.0.2",
+    "inquirer": "^8.2.6",
+    "simple-git": "^3.30.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^8.2.10",
+    "@types/node": "^25.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/multi-repo-orchestrator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/multi-repo-orchestrator/issues"
+  },
+  "homepage": "https://github.com/yourusername/multi-repo-orchestrator#readme"
+}

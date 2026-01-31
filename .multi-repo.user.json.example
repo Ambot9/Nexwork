@@ -1,0 +1,19 @@
+{
+  "searchPaths": [
+    "FE",
+    "BE",
+    "services",
+    "packages",
+    "apps",
+    "frontend",
+    "backend"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    ".git",
+    "coverage",
+    "tmp"
+  ]
+}

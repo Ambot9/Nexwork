@@ -1,0 +1,376 @@
+import inquirer from 'inquirer';
+import { ConfigManager } from '../core/config-manager';
+import { WorktreeManager } from '../core/worktree-manager';
+import { Feature, ProjectStatus } from '../types';
+import chalk from 'chalk';
+import * as path from 'path';
+import * as fs from 'fs';
+import { execSync } from 'child_process';
+
+export async function createCommand(workspaceRootParam: string): Promise<void> {
+  console.log(chalk.blue('📝 Creating new feature...'));
+  
+  try {
+    const configManager = new ConfigManager(workspaceRootParam);
+    const config = configManager.loadConfig();
+    const workspaceRoot = config.workspaceRoot;
+    const availableProjects = configManager.getAvailableProjects();
+    
+    if (availableProjects.length === 0) {
+      console.error(chalk.red('❌ No projects found. Run "multi-repo init" first.'));
+      process.exit(1);
+    }
+
+    // Prompt for feature details
+    const answers = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'featureName',
+        message: 'Feature name:',
+        validate: (input: string) => input.length > 0 || 'Feature name is required'
+      },
+      {
+        type: 'checkbox',
+        name: 'projects',
+        message: 'Select projects:',
+        choices: availableProjects.map(p => ({ name: p, value: p })),
+        validate: (input: string[]) => input.length > 0 || 'Select at least one project'
+      }
+    ]);
+
+    // Generate feature ID
+    const existingFeatures = configManager.getAllFeatures();
+    const featureId = `FEAT-${String(existingFeatures.length + 1).padStart(3, '0')}`;
+
+    // Create project statuses
+    const projectStatuses: ProjectStatus[] = answers.projects.map((projectName: string) => ({
+      name: projectName,
+      status: 'pending' as const,
+      branch: `feature/${featureId}`,
+      worktreePath: '',
+      lastUpdated: new Date().toISOString()
+    }));
+
+    // Create feature
+    const feature: Feature = {
+      id: featureId,
+      name: answers.featureName,
+      projects: projectStatuses,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    configManager.addFeature(feature);
+
+    // Create feature tracking folder
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    const featureFolderName = `${dateStr}-${answers.featureName.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    const featuresDir = path.join(workspaceRoot, 'features');
+    const featureTrackingDir = path.join(featuresDir, featureFolderName);
+
+    // Create features directory if it doesn't exist
+    if (!fs.existsSync(featuresDir)) {
+      fs.mkdirSync(featuresDir);
+    }
+
+    // Create feature-specific folder
+    fs.mkdirSync(featureTrackingDir, { recursive: true });
+
+    // Create info file
+    const infoContent = `Feature ID: ${featureId}
+Feature Name: ${answers.featureName}
+Created: ${new Date().toLocaleString()}
+Projects: ${answers.projects.join(', ')}
+
+Status: In Progress
+`;
+    fs.writeFileSync(path.join(featureTrackingDir, 'info.txt'), infoContent);
+
+    // Create README.md for AI context
+    const readmeContent = `# Feature: ${answers.featureName}
+
+**Feature ID:** ${featureId}  
+**Created:** ${new Date().toLocaleString()}  
+**Status:** In Progress
+
+## Projects Involved
+
+${answers.projects.map((p: string) => `- ${p}`).join('\n')}
+
+## Worktree Locations
+
+The worktrees will be created in:
+${answers.projects.map((p: string) => {
+  const projectPath = configManager.getProjectPath(p);
+  const projectDir = path.dirname(projectPath);
+  return `- **${p}**: \`${path.join(projectDir, p + '-' + featureId)}/\``;
+}).join('\n')}
+
+## For AI Assistants (Claude, ChatGPT, etc.)
+
+When working on this feature, the code is located in the worktree directories listed above.
+
+**Important Context:**
+- Each worktree is an isolated copy of the repository on branch \`feature/${featureId}\`
+- Changes made in worktrees do NOT affect the main branch
+- All projects are part of the same feature: **${answers.featureName}**
+
+## Quick Commands
+
+\`\`\`bash
+# Check status of all features
+multi-repo feature:status
+
+# Update project status
+multi-repo feature:update
+
+# Complete this feature
+multi-repo feature:complete ${featureId}
+\`\`\`
+
+## Notes
+
+Add your notes here...
+`;
+    fs.writeFileSync(path.join(featureTrackingDir, 'README.md'), readmeContent);
+
+    console.log(chalk.green(`\n✅ Feature created: ${featureId}`));
+    console.log(chalk.white(`Feature name: ${answers.featureName}`));
+    console.log(chalk.white(`Projects: ${answers.projects.join(', ')}`));
+    console.log(chalk.cyan(`📁 Tracking folder: ${featureTrackingDir}`));
+
+    // Ask if user wants to create worktrees now
+    const { createWorktrees } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'createWorktrees',
+        message: 'Create worktrees now?',
+        default: true
+      }
+    ]);
+
+    if (createWorktrees) {
+      console.log(chalk.blue('\n🔧 Creating worktrees...'));
+      
+      const worktreePaths: string[] = [];
+      
+      for (const projectName of answers.projects) {
+        try {
+          const projectPath = configManager.getProjectPath(projectName);
+          const worktreeManager = new WorktreeManager(projectPath);
+          
+          // Pass featureTrackingDir so worktree is created inside feature folder
+          const worktreePath = await worktreeManager.createWorktree(featureId, projectName, featureTrackingDir);
+          worktreePaths.push(`${projectName}: ${worktreePath}`);
+          
+          // Update project status with worktree path
+          const updatedProjects = feature.projects.map(p => 
+            p.name === projectName 
+              ? { ...p, worktreePath }
+              : p
+          );
+          
+          configManager.updateFeature(featureId, { projects: updatedProjects });
+          
+        } catch (error) {
+          console.error(chalk.red(`❌ Failed to create worktree for ${projectName}: ${error}`));
+        }
+      }
+
+      // Save worktree paths to tracking folder
+      if (worktreePaths.length > 0) {
+        const worktreesContent = `Worktrees for ${featureId}:\n\n${worktreePaths.join('\n')}\n`;
+        fs.writeFileSync(path.join(featureTrackingDir, 'worktrees.txt'), worktreesContent);
+
+        // Update README with actual worktree paths
+        const updatedFeature = configManager.getFeature(featureId);
+        if (updatedFeature) {
+          const worktreeList = updatedFeature.projects
+            .filter(p => p.worktreePath)
+            .map(p => `- **${p.name}**: \`${p.worktreePath}\``)
+            .join('\n');
+
+          const updatedReadme = `# Feature: ${answers.featureName}
+
+**Feature ID:** ${featureId}  
+**Created:** ${new Date().toLocaleString()}  
+**Status:** In Progress
+
+## Projects Involved
+
+${answers.projects.map((p: string) => `- ${p}`).join('\n')}
+
+## Worktree Locations
+
+${worktreeList}
+
+## For AI Assistants (Claude, ChatGPT, etc.)
+
+When working on this feature, the code is located in the worktree directories listed above.
+
+**Important Context:**
+- Each worktree is an isolated copy of the repository on branch \`feature/${featureId}\`
+- Changes made in worktrees do NOT affect the main/staging branch
+- All projects are part of the same feature: **${answers.featureName}**
+
+**To work on a specific project, navigate to its worktree:**
+${updatedFeature.projects
+  .filter(p => p.worktreePath)
+  .map(p => `\`\`\`bash\ncd ${p.worktreePath}\n\`\`\``)
+  .join('\n\n')}
+
+## Quick Commands
+
+\`\`\`bash
+# Check status of all features
+multi-repo feature:status
+
+# Update project status
+multi-repo feature:update
+
+# Complete this feature
+multi-repo feature:complete ${featureId}
+\`\`\`
+
+## Notes
+
+Add your notes here...
+`;
+          fs.writeFileSync(path.join(featureTrackingDir, 'README.md'), updatedReadme);
+
+          // Generate project structure for each worktree
+          const projectStructures = updatedFeature.projects
+            .filter(p => p.worktreePath)
+            .map(p => {
+              try {
+                // Use tree command or fallback to ls
+                let structure = '';
+                try {
+                  // Try tree command (ignore node_modules, .git, dist, build)
+                  structure = execSync(
+                    `tree -L 3 -I 'node_modules|.git|dist|build|coverage|.next|out' "${p.worktreePath}"`,
+                    { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+                  );
+                } catch (treeError) {
+                  // Fallback to find command
+                  structure = execSync(
+                    `find "${p.worktreePath}" -maxdepth 3 -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/dist/*" -not -path "*/build/*" | head -100`,
+                    { encoding: 'utf-8' }
+                  );
+                }
+                return { name: p.name, path: p.worktreePath, structure };
+              } catch (error) {
+                return { name: p.name, path: p.worktreePath, structure: 'Unable to generate structure' };
+              }
+            });
+
+          // Create claude.md for Claude AI
+          const claudeMd = `# Context for Claude AI
+
+## Current Feature
+**${answers.featureName}** (${featureId})
+
+## Your Task
+You are helping to implement the feature: **${answers.featureName}**
+
+This feature spans across multiple repositories. Each repository has its own isolated worktree for this feature.
+
+## Project Worktrees
+
+${updatedFeature.projects
+  .filter(p => p.worktreePath)
+  .map(p => `### ${p.name}
+- **Path**: \`${p.worktreePath}\`
+- **Branch**: \`${p.branch}\`
+- **Status**: ${p.status}`)
+  .join('\n\n')}
+
+## Project File Structures
+
+**IMPORTANT**: Use these paths directly. Do NOT scan directories - all important files are listed below.
+
+${projectStructures.map(ps => `### ${ps.name}
+
+**Location**: \`${ps.path}\`
+
+\`\`\`
+${ps.structure}
+\`\`\`
+`).join('\n')}
+
+## Important Rules
+
+1. **Always use absolute paths** when referencing files
+2. **Each worktree is isolated** - changes don't affect main/staging branch
+3. **All projects are part of the same feature** - keep consistency across repos
+4. **Git branch**: All worktrees are on \`feature/${featureId}\`
+
+## Quick Navigation
+
+To work on each project, use these commands:
+
+${updatedFeature.projects
+  .filter(p => p.worktreePath)
+  .map(p => `\`\`\`bash
+# Work on ${p.name}
+cd ${p.worktreePath}
+\`\`\``)
+  .join('\n\n')}
+
+## Workflow
+
+1. **Read the code** in the worktree paths listed above
+2. **Make changes** as requested by the user
+3. **Test your changes** in the isolated worktree
+4. **Commit** when ready:
+   \`\`\`bash
+   git add .
+   git commit -m "Description of changes"
+   \`\`\`
+
+## Project Structure
+
+${updatedFeature.projects
+  .filter(p => p.worktreePath)
+  .map(p => `**${p.name}**: ${p.worktreePath.includes('/FE/') ? 'Frontend' : 'Backend'} project`)
+  .join('\n')}
+
+## User Notes
+
+_(User can add notes here about what needs to be done)_
+
+---
+
+**Feature Created**: ${new Date().toLocaleString()}
+**Current Directory**: \`${featureTrackingDir}\`
+`;
+          fs.writeFileSync(path.join(featureTrackingDir, 'claude.md'), claudeMd);
+        }
+      }
+
+      console.log(chalk.green('\n✅ All worktrees created!'));
+      console.log(chalk.yellow('\nNext steps:'));
+      console.log(chalk.white('  1. Navigate to the worktree directories to start working'));
+      
+      // Display worktree paths
+      const updatedFeature = configManager.getFeature(featureId);
+      if (updatedFeature) {
+        for (const project of updatedFeature.projects) {
+          if (project.worktreePath) {
+            console.log(chalk.gray(`     cd ${project.worktreePath}`));
+          }
+        }
+      }
+      
+      console.log(chalk.white(`  2. Check feature folder: ${featureTrackingDir}`));
+      console.log(chalk.cyan(`     📄 README.md - Feature overview`));
+      console.log(chalk.cyan(`     🤖 claude.md - Context for Claude AI`));
+      console.log(chalk.white('  3. Run "multi-repo feature:status" to track progress'));
+    }
+
+  } catch (error) {
+    console.error(chalk.red(`❌ Error: ${error}`));
+    process.exit(1);
+  }
+}

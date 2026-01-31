@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "description": "Multi-Repo Orchestrator Configuration",
+  "searchPaths": [
+    "FE/*",
+    "BE/*",
+    "services/*",
+    "packages/*",
+    "apps/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    ".git"
+  ],
+  "workspaceRoot": null
+}
