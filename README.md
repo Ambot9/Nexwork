@@ -1,6 +1,21 @@
-# Multi-Repo Orchestrator
+# Nexwork
 
 A powerful CLI tool for managing features that span multiple Git repositories using worktrees, with AI-powered context generation for enhanced productivity.
+
+## 🚀 Try It Now (2 minutes)
+
+```bash
+# Install
+npm install -g multi-repo-orchestrator
+
+# Or try with npx (no install needed)
+npx multi-repo-orchestrator --help
+
+# Quick demo
+cd your-workspace
+npx multi-repo-orchestrator init
+npx multi-repo-orchestrator feature:create
+```
 
 ## Features
 
