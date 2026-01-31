@@ -1,5 +1,10 @@
 # Nexwork
 
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Ambot9/Nexwork)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node](https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+
 A powerful CLI tool for managing features that span multiple Git repositories using worktrees, with AI-powered context generation for enhanced productivity.
 
 ## 🚀 Try It Now (2 minutes)
