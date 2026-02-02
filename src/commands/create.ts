@@ -189,19 +189,27 @@ Add your notes here...
       
       const worktreePaths: string[] = [];
       
+      const sourceBranches: Set<string> = new Set();
+      const warnings: string[] = [];
+
       for (const projectName of answers.projects) {
         try {
           const projectPath = configManager.getProjectPath(projectName);
           const worktreeManager = new WorktreeManager(projectPath);
           
           // Pass featureTrackingDir so worktree is created inside feature folder
-          const worktreePath = await worktreeManager.createWorktree(featureId, projectName, featureTrackingDir);
-          worktreePaths.push(`${projectName}: ${worktreePath}`);
+          const result = await worktreeManager.createWorktree(featureId, projectName, featureTrackingDir);
+          worktreePaths.push(`${projectName}: ${result.path}`);
+          sourceBranches.add(result.sourceBranch);
+          
+          if (result.warning) {
+            warnings.push(`${projectName}: ${result.warning}`);
+          }
           
           // Update project status with worktree path
           const updatedProjects = feature.projects.map(p => 
             p.name === projectName 
-              ? { ...p, worktreePath }
+              ? { ...p, worktreePath: result.path }
               : p
           );
           
@@ -210,6 +218,17 @@ Add your notes here...
         } catch (error) {
           console.error(chalk.red(`❌ Failed to create worktree for ${projectName}: ${error}`));
         }
+      }
+
+      // Show warnings if any
+      if (warnings.length > 0) {
+        console.log(chalk.yellow('\n⚠️  Warnings:'));
+        warnings.forEach(w => console.log(chalk.yellow(`  ${w}`)));
+      }
+
+      // Show source branches summary
+      if (sourceBranches.size > 0) {
+        console.log(chalk.green(`\n✨ Worktrees created from branch(es): ${Array.from(sourceBranches).join(', ')}`));
       }
 
       // Save worktree paths to tracking folder

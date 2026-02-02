@@ -51,13 +51,43 @@ export class WorktreeManager {
   }
 
   /**
+   * Get current branch
+   */
+  async getCurrentBranch(): Promise<string> {
+    const status = await this.git.status();
+    return status.current || 'unknown';
+  }
+
+  /**
+   * Check if current branch is up-to-date with remote
+   */
+  async checkIfUpToDate(branchName: string): Promise<{ upToDate: boolean; behind: number; ahead: number }> {
+    try {
+      // Fetch latest from remote
+      await this.git.fetch();
+      
+      // Get tracking branch
+      const status = await this.git.status();
+      
+      return {
+        upToDate: status.behind === 0,
+        behind: status.behind,
+        ahead: status.ahead
+      };
+    } catch (error) {
+      // If no remote or other error, assume up-to-date
+      return { upToDate: true, behind: 0, ahead: 0 };
+    }
+  }
+
+  /**
    * Create a worktree for a feature branch
    */
   async createWorktree(
     featureId: string,
     projectName: string,
     featureTrackingDir?: string
-  ): Promise<string> {
+  ): Promise<{ path: string; sourceBranch: string; warning?: string }> {
     const branchName = `feature/${featureId}`;
     
     // If featureTrackingDir is provided, create worktree inside it
@@ -69,26 +99,35 @@ export class WorktreeManager {
     try {
       // Check if worktree already exists
       if (fs.existsSync(worktreePath)) {
+        const currentBranch = await this.getCurrentBranch();
         console.log(`Worktree already exists at: ${worktreePath}`);
-        return worktreePath;
+        return { path: worktreePath, sourceBranch: currentBranch };
       }
 
-      // Get default branch
-      const defaultBranch = await this.getDefaultBranch();
+      // Get current branch (where user is standing)
+      const currentBranch = await this.getCurrentBranch();
+      
+      // Check if current branch is up-to-date
+      const updateStatus = await this.checkIfUpToDate(currentBranch);
+      let warning: string | undefined;
+      
+      if (!updateStatus.upToDate && updateStatus.behind > 0) {
+        warning = `⚠️  Branch '${currentBranch}' is ${updateStatus.behind} commit(s) behind remote. Consider running 'git pull' first.`;
+      }
 
-      // Create new branch from default branch if it doesn't exist
+      // Create new branch from current branch if it doesn't exist
       const branches = await this.git.branch();
       if (!branches.all.includes(branchName)) {
-        // Create branch from default branch
-        await this.git.checkoutBranch(branchName, defaultBranch);
-        await this.git.checkout(defaultBranch); // Go back to default
+        // Create branch from current branch (not default!)
+        await this.git.checkoutBranch(branchName, currentBranch);
+        await this.git.checkout(currentBranch); // Go back to original branch
       }
 
       // Create worktree
       await this.git.raw(['worktree', 'add', worktreePath, branchName]);
       
-      console.log(`✅ Created worktree: ${worktreePath}`);
-      return worktreePath;
+      console.log(`✅ Created worktree from '${currentBranch}': ${worktreePath}`);
+      return { path: worktreePath, sourceBranch: currentBranch, warning };
     } catch (error) {
       throw new Error(`Failed to create worktree: ${error}`);
     }
@@ -144,14 +183,6 @@ export class WorktreeManager {
   async branchExists(branchName: string): Promise<boolean> {
     const branches = await this.git.branch();
     return branches.all.includes(branchName);
-  }
-
-  /**
-   * Get current branch name
-   */
-  async getCurrentBranch(): Promise<string> {
-    const branch = await this.git.branch();
-    return branch.current;
   }
 
   /**
