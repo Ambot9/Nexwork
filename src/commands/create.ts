@@ -175,63 +175,27 @@ Add your notes here...
     console.log(chalk.cyan(`📁 Tracking folder: ${featureTrackingDir}`));
 
     // Ask if user wants to create worktrees now
-    const worktreeOptions = await inquirer.prompt([
+    const { createWorktrees } = await inquirer.prompt([
       {
         type: 'confirm',
         name: 'createWorktrees',
         message: 'Create worktrees now?',
         default: true
-      },
-      {
-        type: 'confirm',
-        name: 'manualNaming',
-        message: 'Use custom names for worktrees? (otherwise auto-generated)',
-        default: false,
-        when: (answers) => answers.createWorktrees
       }
     ]);
 
-    if (worktreeOptions.createWorktrees) {
+    if (createWorktrees) {
       console.log(chalk.blue('\n🔧 Creating worktrees...'));
       
       const worktreePaths: string[] = [];
-      
-      // If manual naming, collect custom names first
-      const customNames: Record<string, string> = {};
-      if (worktreeOptions.manualNaming) {
-        console.log(chalk.cyan('\n📝 Enter custom names for each worktree:'));
-        for (const projectName of answers.projects) {
-          const { customName } = await inquirer.prompt([
-            {
-              type: 'input',
-              name: 'customName',
-              message: `Custom name for ${projectName}:`,
-              default: projectName,
-              validate: (input: string) => {
-                if (!input || input.trim().length === 0) {
-                  return 'Name cannot be empty';
-                }
-                if (!/^[a-zA-Z0-9_-]+$/.test(input)) {
-                  return 'Name can only contain letters, numbers, hyphens, and underscores';
-                }
-                return true;
-              }
-            }
-          ]);
-          customNames[projectName] = customName;
-        }
-      }
       
       for (const projectName of answers.projects) {
         try {
           const projectPath = configManager.getProjectPath(projectName);
           const worktreeManager = new WorktreeManager(projectPath);
           
-          // Use custom name if provided, otherwise use project name
-          const worktreeName = customNames[projectName] || projectName;
-          
           // Pass featureTrackingDir so worktree is created inside feature folder
-          const worktreePath = await worktreeManager.createWorktree(featureId, worktreeName, featureTrackingDir);
+          const worktreePath = await worktreeManager.createWorktree(featureId, projectName, featureTrackingDir);
           worktreePaths.push(`${projectName}: ${worktreePath}`);
           
           // Update project status with worktree path
