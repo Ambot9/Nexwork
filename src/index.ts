@@ -18,7 +18,7 @@ const program = new Command();
 program
   .name('multi-repo')
   .description('Multi-repository orchestrator for managing features across microservices')
-  .version('1.0.2');
+  .version('1.0.3');
 
 import { ConfigManager } from './core/config-manager';
 
