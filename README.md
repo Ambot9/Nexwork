@@ -1,6 +1,6 @@
 # Nexwork
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Ambot9/Nexwork)
+[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/Ambot9/Nexwork)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -122,6 +122,15 @@ multi-repo feature:update
 
 # Complete feature and cleanup worktrees
 multi-repo feature:complete [feature-id]
+
+# Bulk delete multiple features (interactive selection)
+multi-repo feature:cleanup
+
+# Delete all features at once
+multi-repo feature:cleanup --all
+
+# Delete all feature/* branches across all repos
+multi-repo feature:prune-branches
 ```
 
 ### AI Productivity Commands

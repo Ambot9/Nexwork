@@ -107,6 +107,17 @@ export class WorktreeManager {
   }
 
   /**
+   * Delete a branch
+   */
+  async deleteBranch(branchName: string): Promise<void> {
+    try {
+      await this.git.deleteLocalBranch(branchName, true); // force delete
+    } catch (error) {
+      throw new Error(`Failed to delete branch: ${error}`);
+    }
+  }
+
+  /**
    * List all worktrees for this repository
    */
   async listWorktrees(): Promise<string[]> {

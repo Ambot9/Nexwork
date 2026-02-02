@@ -9,6 +9,8 @@ import { updateCommand } from './commands/update';
 import { refreshContextCommand } from './commands/refresh-context';
 import { runCommand } from './commands/run';
 import { statsCommand } from './commands/stats';
+import { cleanupCommand } from './commands/cleanup';
+import { pruneBranchesCommand } from './commands/prune-branches';
 import * as path from 'path';
 
 const program = new Command();
@@ -16,7 +18,7 @@ const program = new Command();
 program
   .name('multi-repo')
   .description('Multi-repository orchestrator for managing features across microservices')
-  .version('1.0.0');
+  .version('1.0.1');
 
 import { ConfigManager } from './core/config-manager';
 
@@ -115,6 +117,27 @@ program
   .action(async (featureId, options) => {
     const workspaceRoot = getWorkspaceRoot(options.workspace);
     await statsCommand(workspaceRoot, featureId);
+  });
+
+program
+  .command('feature:cleanup')
+  .alias('feature cleanup')
+  .description('Bulk delete features (select multiple or delete all)')
+  .option('--all', 'Delete all features without prompting for selection')
+  .option('-w, --workspace <path>', 'Workspace root directory')
+  .action(async (options) => {
+    const workspaceRoot = getWorkspaceRoot(options.workspace);
+    await cleanupCommand(workspaceRoot, options.all);
+  });
+
+program
+  .command('feature:prune-branches')
+  .alias('feature prune-branches')
+  .description('Delete all feature/* branches across all repos')
+  .option('-w, --workspace <path>', 'Workspace root directory')
+  .action(async (options) => {
+    const workspaceRoot = getWorkspaceRoot(options.workspace);
+    await pruneBranchesCommand(workspaceRoot);
   });
 
 program.parse(process.argv);
