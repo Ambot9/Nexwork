@@ -1,6 +1,6 @@
 {
   "name": "multi-repo-orchestrator",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Multi-repository orchestrator for managing features across microservices",
   "main": "dist/index.js",
   "bin": {

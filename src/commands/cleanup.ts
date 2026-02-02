@@ -2,6 +2,8 @@ import { ConfigManager } from '../core/config-manager';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { WorktreeManager } from '../core/worktree-manager';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export async function cleanupCommand(workspaceRoot: string, all: boolean = false): Promise<void> {
   console.log(chalk.blue('🧹 Cleanup Features'));
@@ -118,6 +120,20 @@ export async function cleanupCommand(workspaceRoot: string, all: boolean = false
           } catch (error) {
             console.log(chalk.yellow(`  ⚠️  Error cleaning ${project.name}: ${error}`));
           }
+        }
+
+        // Delete feature folder
+        try {
+          const featureDate = new Date(feature.createdAt).toISOString().split('T')[0];
+          const featureFolderName = `${featureDate}-${feature.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+          const featureFolder = path.join(workspaceRoot, 'features', featureFolderName);
+          
+          if (fs.existsSync(featureFolder)) {
+            fs.rmSync(featureFolder, { recursive: true, force: true });
+            console.log(chalk.gray(`  ✓ Deleted folder: ${featureFolderName}`));
+          }
+        } catch (error) {
+          console.log(chalk.yellow(`  ⚠️  Could not delete feature folder: ${error}`));
         }
 
         // Delete feature from config

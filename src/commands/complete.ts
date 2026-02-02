@@ -2,6 +2,8 @@ import inquirer from 'inquirer';
 import { ConfigManager } from '../core/config-manager';
 import { WorktreeManager } from '../core/worktree-manager';
 import chalk from 'chalk';
+import * as path from 'path';
+import * as fs from 'fs';
 
 export async function completeCommand(workspaceRoot: string, featureId?: string): Promise<void> {
   try {
@@ -131,6 +133,20 @@ export async function completeCommand(workspaceRoot: string, featureId?: string)
     ]);
 
     if (removeFromConfig) {
+      // Delete feature folder
+      try {
+        const featureDate = new Date(feature.createdAt).toISOString().split('T')[0];
+        const featureFolderName = `${featureDate}-${feature.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        const featureFolder = path.join(workspaceRoot, 'features', featureFolderName);
+        
+        if (fs.existsSync(featureFolder)) {
+          fs.rmSync(featureFolder, { recursive: true, force: true });
+          console.log(chalk.gray(`✓ Deleted feature folder`));
+        }
+      } catch (error) {
+        console.log(chalk.yellow(`⚠️  Could not delete feature folder: ${error}`));
+      }
+
       configManager.deleteFeature(featureId);
       console.log(chalk.green(`\n✅ Feature ${featureId} completed and removed from configuration!`));
     } else {
