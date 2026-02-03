@@ -22,16 +22,27 @@ npx multi-repo-orchestrator init
 npx multi-repo-orchestrator feature:create
 ```
 
-## Features
+## ✨ Features
 
+### Core Features
 - **Multi-Repo Feature Management** - Track features across multiple repositories
 - **Git Worktree Integration** - Create isolated worktrees for each project in a feature
+- **Smart Branch Detection** - Creates worktrees from your current branch (staging, main, demo, etc.)
+- **Pull Check Warning** - Warns if your branch is behind remote before creating worktrees
+- **Custom Feature IDs** - Use your own IDs (WPAY-001, JIRA-1234, etc.) instead of auto-generated
+
+### Productivity Features
 - **AI Context Generation** - Auto-generate `claude.md` with file structures to boost AI productivity
 - **Cross-Repo Command Execution** - Run commands across all worktrees in parallel
 - **Time Tracking** - Automatic tracking of feature start/completion times
 - **Git Statistics** - Track commits, files changed, and lines modified
 - **Conflict Detection** - Identifies features working on the same repositories
 - **Execution Planning** - Suggests optimal order for working on features
+
+### Cleanup Features
+- **Bulk Cleanup** - Delete multiple features at once
+- **Complete Cleanup** - Removes worktrees, branches, and feature folders automatically
+- **Branch Pruning** - Clean up all orphaned feature branches across repos
 
 ## Installation
 
@@ -42,8 +53,8 @@ npm install -g multi-repo-orchestrator
 Or from source:
 
 ```bash
-git clone https://github.com/yourusername/multi-repo-orchestrator.git
-cd multi-repo-orchestrator
+git clone https://github.com/Ambot9/Nexwork.git
+cd Nexwork
 npm install
 npm run build
 npm install -g .
@@ -62,16 +73,40 @@ This will auto-discover all Git repositories in your workspace (searches in `FE/
 
 ### 2. Create a feature
 
+**Important:** Before creating a feature, make sure you're on the right branch!
+
 ```bash
+# Check your current branch (e.g., in coloris repo)
+cd BE/coloris
+git branch
+# * staging  ← Make sure you're on the correct branch
+
+# Pull latest changes
+git pull
+
+# Now create the feature from workspace root
+cd /path/to/your/workspace
 multi-repo feature:create
 ```
 
 This will:
+- **Detect your current branch** (staging, main, demo, etc.)
+- **Check if branch is up-to-date** with remote
+- **Warn you if behind** (needs git pull)
+- Prompt you to enter feature name
+- Allow **custom Feature ID** (optional: WPAY-001, JIRA-1234, etc.)
 - Prompt you to select projects involved in the feature
-- Create a feature tracking folder with date stamp (e.g., `features/2026-01-31-MyFeature/`)
-- Generate git worktrees for each selected project
+- Create a feature tracking folder with date stamp (e.g., `features/2026-02-02-MyFeature/`)
+- **Create git worktrees FROM your current branch** (not default branch!)
+- **Confirm which branch** worktrees were created from
 - Auto-generate `claude.md` with complete file structures
 - Create `README.md`, `info.txt`, and `worktrees.txt` for reference
+
+**Example Output:**
+```
+✅ Created worktree from 'staging': /path/to/features/2026-02-02-MyFeature/coloris
+✨ Worktrees created from branch(es): staging
+```
 
 ### 3. View feature status
 
@@ -192,49 +227,110 @@ Create `.multi-repo.user.json` in your workspace root:
 
 The tool automatically detects:
 - **Workspace root** - Looks for `.multi-repo-config.json` or workspace folders
-- **Default branch** - Tries `staging`, `main`, `master`, `develop` in order
+- **Current branch** - Detects which branch you're on when creating worktrees
+- **Branch sync status** - Checks if branch is up-to-date with remote
 - **Project type** - Detects from files (package.json, *.csproj, etc.)
 
-## Workflow Example
+### Important: Branch Detection
+
+Nexwork creates worktrees **from your current branch**, not from a default branch!
+
+**Example:**
+```bash
+# If you're on 'staging' branch
+cd BE/coloris
+git branch
+# * staging
+
+# Worktrees will be created FROM staging
+multi-repo feature:create
+# ✨ Worktrees created from branch(es): staging
+
+# If you're on 'demo' branch
+cd BE/coloris
+git checkout demo
+multi-repo feature:create
+# ✨ Worktrees created from branch(es): demo
+```
+
+**Always ensure:**
+1. You're on the correct branch before creating features
+2. Your branch is up-to-date (`git pull`)
+3. The tool will warn you if behind remote
+
+## 📖 Complete Workflow Example
 
 ```bash
 # 1. Initialize (one-time setup)
 cd ~/workspace
 multi-repo init
 
-# 2. Create a feature
+# 2. Ensure you're on the correct branch and up-to-date
+cd BE/coloris
+git checkout staging
+git pull
+cd FE/frontend-ui
+git checkout staging
+git pull
+
+# 3. Create a feature
+cd ~/workspace
 multi-repo feature:create
 # > Enter feature name: "Add Payment Integration"
 # > Select projects: [backend-api, frontend-ui, payment-service]
+# > Use custom Feature ID? (default: FEAT-001) Yes
+# > Enter custom Feature ID: WPAY-001
+# > Create worktrees now? Yes
+# ✅ Created worktree from 'staging': .../backend-api
+# ✅ Created worktree from 'staging': .../frontend-ui
+# ✅ Created worktree from 'staging': .../payment-service
+# ✨ Worktrees created from branch(es): staging
 
-# 3. Check status
+# 4. Check status
 multi-repo feature:status
-# FEAT-001: Add Payment Integration
+# WPAY-001: Add Payment Integration
 # Progress: [0/3] 0%
 
-# 4. Start working
-cd features/2026-01-31-Add-Payment-Integration/
-# Open in IDE and make changes...
+# 5. Start working
+cd features/2026-02-02-Add-Payment-Integration/
+code .  # Open in IDE and make changes...
 
-# 5. Run tests across all repos
-multi-repo feature:run FEAT-001 "npm test"
+# 6. Work on projects
+cd backend-api
+git add .
+git commit -m "Add payment API endpoints"
+git push origin feature/WPAY-001
 
-# 6. Update progress
+cd ../frontend-ui
+git add .
+git commit -m "Add payment UI components"
+git push origin feature/WPAY-001
+
+# 7. Run tests across all repos
+cd ~/workspace
+multi-repo feature:run WPAY-001 "npm test"
+
+# 8. Update progress
 multi-repo feature:update
-# > Select feature: FEAT-001
+# > Select feature: WPAY-001
 # > Select project: backend-api
-# > New status: in_progress
+# > New status: completed
 
-# 7. View statistics
-multi-repo feature:stats FEAT-001
+# 9. View statistics
+multi-repo feature:stats WPAY-001
 # Shows time spent, commits, changes
 
-# 8. Refresh AI context after adding files
-multi-repo feature:refresh-context FEAT-001
+# 10. Refresh AI context after adding files
+multi-repo feature:refresh-context WPAY-001
 
-# 9. Complete feature when done
-multi-repo feature:complete FEAT-001
+# 11. Complete feature when done
+multi-repo feature:complete WPAY-001
+# > What would you like to do? Full cleanup
+# > Remove feature from configuration? Yes
+# ✅ Feature WPAY-001 completed and removed!
 ```
+
+**📚 For detailed step-by-step guide, see [GETTING_STARTED.md](GETTING_STARTED.md)**
 
 ## Key Concepts
 
@@ -341,7 +437,36 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 Built for teams managing microservices across multiple repositories.
 
-## Roadmap
+## 📋 Version History
+
+### v1.1.0 (Latest) - Smart Branch Detection
+- ✅ Creates worktrees from current branch (not default)
+- ✅ Checks if branch is up-to-date with remote
+- ✅ Warns if branch is behind (needs pull)
+- ✅ Confirms source branch after creation
+
+### v1.0.5 - Complete Cleanup
+- ✅ Delete feature folders automatically
+- ✅ Delete Git branches
+- ✅ Complete cleanup (no leftovers)
+
+### v1.0.4 - Simplified Workflow
+- ✅ Custom Feature IDs (WPAY-001, JIRA-1234)
+- ✅ Removed manual worktree naming (cleaner)
+
+### v1.0.1 - Bulk Operations
+- ✅ Bulk feature cleanup
+- ✅ Prune orphaned branches
+- ✅ Interactive selection
+
+### v1.0.0 - Initial Release
+- ✅ Multi-repo feature management
+- ✅ Git worktree integration
+- ✅ AI context generation
+- ✅ Cross-repo commands
+- ✅ Time tracking & statistics
+
+## 🗺️ Roadmap
 
 - [ ] Feature templates for common patterns
 - [ ] One-command rollback for merged features
@@ -352,25 +477,44 @@ Built for teams managing microservices across multiple repositories.
 - [ ] Custom scripts per feature
 - [ ] Integration with CI/CD
 
-## Why Multi-Repo Orchestrator?
+## ❓ Why Nexwork?
 
 When working on features that span multiple repositories:
 
 **Before:**
-- Manually clone/branch each repo
-- Track progress in your head or docs
-- Context switching nightmare
-- AI assistants waste tokens scanning files
-- Forget which repos are involved
+- ❌ Manually clone/branch each repo
+- ❌ Track progress in your head or docs
+- ❌ Context switching nightmare
+- ❌ AI assistants waste tokens scanning files
+- ❌ Forget which repos are involved
+- ❌ Accidentally branch from wrong base (main vs staging)
+- ❌ Work with outdated code (forget to pull)
 
 **After:**
-- One command creates all worktrees
-- Auto-generated AI context file
-- Visual progress tracking
-- Conflict detection
-- Run commands across all repos
-- Complete statistics and time tracking
+- ✅ One command creates all worktrees
+- ✅ Auto-generated AI context file
+- ✅ Visual progress tracking
+- ✅ Conflict detection
+- ✅ Run commands across all repos
+- ✅ Complete statistics and time tracking
+- ✅ **Smart branch detection** - Always branches from your current branch
+- ✅ **Pull check** - Warns if you're behind remote
+- ✅ **Complete cleanup** - No leftovers when done
+- ✅ **Custom Feature IDs** - Match your Jira/ticket system
 
 ---
 
-**Star this repo if it helps your workflow!**
+## 📚 Documentation
+
+- **Quick Start:** See above for basic usage
+- **Complete Guide:** [GETTING_STARTED.md](GETTING_STARTED.md) - Step-by-step from zero
+- **GitHub:** [github.com/Ambot9/Nexwork](https://github.com/Ambot9/Nexwork)
+- **Issues:** [Report bugs or request features](https://github.com/Ambot9/Nexwork/issues)
+
+---
+
+## 🌟 Star This Repo!
+
+If Nexwork helps your workflow, please star the repository! ⭐
+
+**Made with ❤️ for teams managing microservices**
