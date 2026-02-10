@@ -76,7 +76,7 @@ export class ConfigManager {
     // Try to load user config if it exists
     const userConfigPath = path.join(this.workspaceRoot, '.multi-repo.user.json');
     let searchPaths = ['FE', 'BE', 'services', 'packages', 'apps'];
-    let exclude = ['node_modules', 'dist', 'build', '.git'];
+    let exclude = ['node_modules', 'dist', 'build', '.git', 'features', '.vscode', '.idea'];
     
     if (fs.existsSync(userConfigPath)) {
       const userConfig = JSON.parse(fs.readFileSync(userConfigPath, 'utf-8'));
@@ -84,7 +84,43 @@ export class ConfigManager {
       exclude = userConfig.exclude || exclude;
     }
 
-    // Search in all specified paths
+    // First, try to search in current directory (root-level projects)
+    console.log('🔍 Searching for projects in workspace root:', this.workspaceRoot);
+    const rootItems = fs.readdirSync(this.workspaceRoot);
+    let foundInRoot = false;
+    
+    for (const item of rootItems) {
+      if (exclude.includes(item) || item.startsWith('.')) {
+        continue;
+      }
+
+      const itemPath = path.join(this.workspaceRoot, item);
+      
+      try {
+        const stats = fs.statSync(itemPath);
+        
+        if (stats.isDirectory()) {
+          const gitPath = path.join(itemPath, '.git');
+          if (fs.existsSync(gitPath)) {
+            projects[item] = item;
+            foundInRoot = true;
+            console.log(`  ✅ Found project in root: ${item}`);
+          }
+        }
+      } catch (error) {
+        // Skip files/folders we can't read
+        continue;
+      }
+    }
+
+    // If we found projects in root, return them (don't search subdirectories)
+    if (foundInRoot) {
+      console.log(`✅ Found ${Object.keys(projects).length} projects in workspace root`);
+      return projects;
+    }
+
+    // Otherwise, search in specified subdirectories (FE/BE structure)
+    console.log('🔍 No projects in root, searching subdirectories:', searchPaths);
     for (const searchPath of searchPaths) {
       const folderPath = path.join(this.workspaceRoot, searchPath);
       
@@ -96,44 +132,32 @@ export class ConfigManager {
       
       for (const item of items) {
         // Skip excluded folders
-        if (exclude.includes(item)) {
+        if (exclude.includes(item) || item.startsWith('.')) {
           continue;
         }
 
         const itemPath = path.join(folderPath, item);
-        const stats = fs.statSync(itemPath);
         
-        // Check if it's a directory and contains a .git folder
-        if (stats.isDirectory()) {
-          const gitPath = path.join(itemPath, '.git');
-          if (fs.existsSync(gitPath)) {
-            const relativePath = path.join(searchPath, item);
-            projects[item] = relativePath;
+        try {
+          const stats = fs.statSync(itemPath);
+          
+          // Check if it's a directory and contains a .git folder
+          if (stats.isDirectory()) {
+            const gitPath = path.join(itemPath, '.git');
+            if (fs.existsSync(gitPath)) {
+              const relativePath = path.join(searchPath, item);
+              projects[item] = relativePath;
+              console.log(`  ✅ Found project in ${searchPath}: ${item}`);
+            }
           }
-        }
-      }
-    }
-
-    // If no projects found with default paths, search current directory
-    if (Object.keys(projects).length === 0) {
-      const items = fs.readdirSync(this.workspaceRoot);
-      for (const item of items) {
-        if (exclude.includes(item)) {
+        } catch (error) {
+          // Skip files/folders we can't read
           continue;
         }
-
-        const itemPath = path.join(this.workspaceRoot, item);
-        const stats = fs.statSync(itemPath);
-        
-        if (stats.isDirectory()) {
-          const gitPath = path.join(itemPath, '.git');
-          if (fs.existsSync(gitPath)) {
-            projects[item] = item;
-          }
-        }
       }
     }
 
+    console.log(`✅ Found ${Object.keys(projects).length} total projects`);
     return projects;
   }
 
@@ -192,12 +216,12 @@ export class ConfigManager {
   /**
    * Update a feature
    */
-  updateFeature(featureId: string, updates: Partial<Feature>): void {
+  updateFeature(featureName: string, updates: Partial<Feature>): void {
     const config = this.loadConfig();
-    const featureIndex = config.features.findIndex(f => f.id === featureId);
+    const featureIndex = config.features.findIndex(f => f.name === featureName);
     
     if (featureIndex === -1) {
-      throw new Error(`Feature ${featureId} not found`);
+      throw new Error(`Feature ${featureName} not found`);
     }
 
     config.features[featureIndex] = {
@@ -213,21 +237,21 @@ export class ConfigManager {
    * Update project status within a feature
    */
   updateProjectStatus(
-    featureId: string,
+    featureName: string,
     projectName: string,
     status: ProjectStatus['status']
   ): void {
     const config = this.loadConfig();
-    const feature = config.features.find(f => f.id === featureId);
+    const feature = config.features.find(f => f.name === featureName);
     
     if (!feature) {
-      throw new Error(`Feature ${featureId} not found`);
+      throw new Error(`Feature ${featureName} not found`);
     }
 
     const project = feature.projects.find(p => p.name === projectName);
     
     if (!project) {
-      throw new Error(`Project ${projectName} not found in feature ${featureId}`);
+      throw new Error(`Project ${projectName} not found in feature ${featureName}`);
     }
 
     const oldStatus = project.status;
@@ -258,11 +282,11 @@ export class ConfigManager {
   }
 
   /**
-   * Get a feature by ID
+   * Get a feature by name
    */
-  getFeature(featureId: string): Feature | undefined {
+  getFeature(featureName: string): Feature | undefined {
     const config = this.loadConfig();
-    return config.features.find(f => f.id === featureId);
+    return config.features.find(f => f.name === featureName);
   }
 
   /**
@@ -276,9 +300,9 @@ export class ConfigManager {
   /**
    * Delete a feature
    */
-  deleteFeature(featureId: string): void {
+  deleteFeature(featureName: string): void {
     const config = this.loadConfig();
-    config.features = config.features.filter(f => f.id !== featureId);
+    config.features = config.features.filter(f => f.name !== featureName);
     this.saveConfig(config);
   }
 
